@@ -1,0 +1,30 @@
+name: build-and-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Package
+        run: |
+          mv bin/libscreen_sharing.dylib "bin/libscreen_sharing-${GITHUB_REF_NAME}.dylib"
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bin/libscreen_sharing-${{ github.ref_name }}.dylib
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
