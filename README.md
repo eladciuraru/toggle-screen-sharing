@@ -11,7 +11,7 @@ by talking directly to `tccd` via XPC.
 
 ## How to run
 
-this tool is compiled to `dyld` so it can be injected into another binary,
+this tool is compiled to `dylib` so it can be injected into another binary,
 the reason for this is that you need `com.apple.private.tcc.manager.access.modify` entitlement
 with both `kTCCServicePostEvent` and `kTCCServiceScreenCapture`.
 
