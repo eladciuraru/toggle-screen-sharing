@@ -34,8 +34,6 @@ void ScreenSharing_Toggle(void)
             screen_capture_success =
                 ScreenSharing_ServiceSendRequest(context, "kTCCServiceScreenCapture");
         }
-
-        break;
     }
 
     if (screen_capture_success && post_event_success) {
