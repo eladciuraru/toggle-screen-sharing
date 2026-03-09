@@ -182,10 +182,15 @@ bool ScreenSharing_ServiceSendRequest(ss_context_t context, const char *service)
 
         xpc_object_t reply =
             xpc_connection_send_message_with_reply_sync(context.connection, request);
-        if (!reply || xpc_get_type(reply) == XPC_TYPE_ERROR) {
-            ScreenSharing__LogXpcObject(context.log, "failed to send request with: ", reply);
+        if (!reply) {
+            context.log("failed to send request with missing reply");
         } else {
-            result = xpc_dictionary_get_bool(reply, "result");
+            if (xpc_get_type(reply) == XPC_TYPE_ERROR) {
+                ScreenSharing__LogXpcObject(context.log, "failed to send request with: ", reply);
+            } else {
+                ScreenSharing__LogXpcObject(context.log, "reply: ", reply);
+                result = xpc_dictionary_get_bool(reply, "result");
+            }
             xpc_release(reply);
         }
         xpc_release(request);
