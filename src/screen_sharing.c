@@ -7,17 +7,30 @@
 
 #include <os/log.h>
 
+#ifdef SCREEN_SHARING_EXECUTABLE
+
+int main(int argc, const char **argv)
+{
+    ss_context_t context = ScreenSharing_ContextCreateFromArgs(argc, argv);
+    ScreenSharing_Toggle(&context);
+    ScreenSharing_ContextDestroy(&context);
+}
+
+#else
 
 __attribute__((constructor))
 static void constructor(void)
 {
-    ScreenSharing_Toggle();
+    ss_context_t context = ScreenSharing_ContextCreateFromEnv();
+    ScreenSharing_Toggle(&context);
+    ScreenSharing_ContextDestroy(&context);
 }
 
-void ScreenSharing_Toggle(void)
+#endif  // SCREEN_SHARING_EXECUTABLE
+
+void ScreenSharing_Toggle(ss_context_t *context)
 {
-    ss_context_t context = ScreenSharing_ContextCreate();
-    context.log("toggling screen sharing to %s", (context.toggle) ? "on" : "off");
+    context->log("toggling screen sharing to %s", (context->toggle) ? "on" : "off");
 
     const char *service_names[] = {
         "com.apple.tccd.system",
@@ -29,30 +42,30 @@ void ScreenSharing_Toggle(void)
     bool success                = false;
 
     for (size_t i = 0; i < ARRAY_COUNT(service_names) && !success; i++) {
-        context.log("connecting to %s", service_names[i]);
-        if (!ScreenSharing_ServiceConnect(&context, service_names[i])) {
+        context->log("connecting to %s", service_names[i]);
+        if (!ScreenSharing_ServiceConnect(context, service_names[i])) {
             continue;
         }
 
         if (!post_event_success) {
             post_event_success =
-                ScreenSharing_ServiceSendRequest(&context, "kTCCServicePostEvent");
+                ScreenSharing_ServiceSendRequest(context, "kTCCServicePostEvent");
         }
 
         if (!screen_capture_success) {
             screen_capture_success =
-                ScreenSharing_ServiceSendRequest(&context, "kTCCServiceScreenCapture");
+                ScreenSharing_ServiceSendRequest(context, "kTCCServiceScreenCapture");
         }
 
         success = post_event_success && screen_capture_success;
     }
 
     if (success) {
-        context.log("successfuly toggled screen sharing");
+        context->log("successfuly toggled screen sharing");
     } else {
-        context.log("failed to toggle screen sharing");
-        context.log("post_event_success = %d", post_event_success);
-        context.log("screen_capture_success = %d", screen_capture_success);
+        context->log("failed to toggle screen sharing");
+        context->log("post_event_success = %d", post_event_success);
+        context->log("screen_capture_success = %d", screen_capture_success);
     }
 }
 
@@ -81,9 +94,37 @@ static void ScreenSharing__LogStderr(const char *format, ...)
     va_end(args);
 }
 
+static void ScreenSharing__LogStdout(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+
+    vfprintf(stdout, format, args);
+    fprintf(stdout, "\n");
+
+    va_end(args);
+}
+
 static void ScreenSharing__LogQuiet(const char *format, ...)
 {
     (void)format;
+}
+
+static ss_log_fn ScreenSharing__LogFnFromString(const char *name, ss_log_fn default_fn)
+{
+    if (!name) {
+        return default_fn;
+    } else if (!strcasecmp(name, "stderr")) {
+        return ScreenSharing__LogStderr;
+    } else if (!strcasecmp(name, "stdout")) {
+        return ScreenSharing__LogStdout;
+    } else if (!strcasecmp(name, "os")) {
+        return ScreenSharing__LogOS;
+    } else if (!strcasecmp(name, "quiet")) {
+        return ScreenSharing__LogQuiet;
+    }
+
+    return default_fn;
 }
 
 static void ScreenSharing__LogXpcObject(ss_log_fn log_fn, const char *message, xpc_object_t object)
@@ -102,22 +143,13 @@ static void ScreenSharing__LogXpcObject(ss_log_fn log_fn, const char *message, x
     }
 }
 
-ss_context_t ScreenSharing_ContextCreate(void)
+ss_context_t ScreenSharing_ContextCreateFromEnv(void)
 {
     ss_context_t context = {0};
 
     char *screen_sharing_log = getenv("SCREEN_SHARING_LOG");
-    if (!screen_sharing_log || !strcasecmp(screen_sharing_log, "stderr")) {
-        context.log = ScreenSharing__LogStderr;
-    } else if (!strcasecmp(screen_sharing_log, "os")) {
-        context.log = ScreenSharing__LogOS;
-    } else if (!strcasecmp(screen_sharing_log, "quiet")) {
-        context.log = ScreenSharing__LogQuiet;
-    } else {
-        context.log = ScreenSharing__LogStderr;
-        ScreenSharing__LogStderr("unknown \"%s\" log value, defaulting to stderr",
-                                 screen_sharing_log);
-    }
+    context.log =
+        ScreenSharing__LogFnFromString(screen_sharing_log, ScreenSharing__LogStderr);
 
     char *screen_sharing_toggle = getenv("SCREEN_SHARING_TOGGLE");
     if (!screen_sharing_toggle || !strcasecmp(screen_sharing_toggle, "on")) {
@@ -127,6 +159,68 @@ ss_context_t ScreenSharing_ContextCreate(void)
     } else {
         context.toggle = true;
         context.log("unknown toggle \"%s\", defaulting to on", screen_sharing_toggle);
+    }
+
+    return context;
+}
+
+ss_context_t ScreenSharing_ContextCreateFromArgs(int argc, const char **argv)
+{
+    ss_context_t context = {
+        .log = ScreenSharing__LogStdout,
+        .toggle = true,
+    };
+
+    if (argc < 1) {
+        return context;
+    }
+
+    const char *program_name = argv[0];
+    bool        show_usage   = false;
+
+    for (int i = 1; i < argc && !show_usage; i++) {
+        if (!strcmp(argv[i], "--log")) {
+            if (i + 1 >= argc || argv[i+1][0] == '-') {
+                ScreenSharing__LogStderr("missing value for log");
+                show_usage = true;
+            } else {
+                context.log =
+                    ScreenSharing__LogFnFromString(argv[++i], context.log);
+            }
+        } else if (!strcmp(argv[i], "--toggle")) {
+            if (i + 1 >= argc || argv[i+1][0] == '-') {
+                ScreenSharing__LogStderr("missing value for toggle");
+                show_usage = true;
+            } else if (!strcasecmp(argv[++i], "on")) {
+                context.toggle = true;
+            } else if (!strcasecmp(argv[i], "off")) {
+                context.toggle = false;
+            } else {
+                ScreenSharing__LogStderr("unknown value for toggle");
+            }
+        } else if (!strcmp(argv[i], "--help") ||
+                   !strcmp(argv[i], "-h")) {
+            show_usage = true;
+        } else {
+            ScreenSharing__LogStderr("unknown argument '%s'", argv[i]);
+            show_usage = true;
+        }
+    }
+
+    if (show_usage) {
+        ScreenSharing__LogStderr(
+            "Usage: %s [OPTIONS]\n\n"
+            "Toggle on/off screen sharing.\n\n"
+            "Options:\n"
+            "  --log <mode>        Set logging output.\n"
+            "                      Supported modes stdout/stderr/os/quiet.\n"
+            "                      Default: stdout\n"
+            "  --toggle <on|off>   Enable or disable screen sharing toggle.\n"
+            "                      Default: on\n"
+            "  -h, --help          Show this help message and exit.\n\n",
+            program_name
+        );
+        exit(1);
     }
 
     return context;

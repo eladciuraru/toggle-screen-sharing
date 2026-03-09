@@ -11,8 +11,34 @@ by talking directly to `tccd` via XPC.
 
 ## How to run
 
-this tool is compiled to `dylib` so it can be injected into another binary,
-the reason for this is that you need `com.apple.private.tcc.manager.access.modify` entitlement
+there are 2 modes supported for running this tool.
+1. executable
+2. injectable dynamic library
+
+for both of the modes, SIP needs to be disabled
+
+### Executable Mode
+
+because this is a self signed executable, `amfi` needs to be disabled,
+either with `amfi_get_out_of_my_way` boot arg or the recommended way using
+[amfidont](https://github.com/zqxwce/amfidont) to allow this specific executable.
+
+then it can just run as a regular executable from command line.
+for example:
+
+```shell
+# toggling on
+./bin/screen_sharing --toggle on
+
+# toggling off
+./bin/screen_sharing --toggle off
+```
+
+### Dynamic Library
+
+with this mode the library needs to be injected into another binary
+with the right entitlements.
+for enabling screen sharing you need `com.apple.private.tcc.manager.access.modify` entitlement
 with both `kTCCServicePostEvent` and `kTCCServiceScreenCapture`.
 
 you can search for such a binary with in [here](https://blacktop.github.io/ipsw/entitlements/).

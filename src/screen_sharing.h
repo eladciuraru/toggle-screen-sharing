@@ -18,9 +18,10 @@ typedef struct {
     xpc_connection_t connection;
 } ss_context_t;
 
-void ScreenSharing_Toggle(void);
+void ScreenSharing_Toggle(ss_context_t *context);
 
-ss_context_t ScreenSharing_ContextCreate(void);
+ss_context_t ScreenSharing_ContextCreateFromEnv(void);
+ss_context_t ScreenSharing_ContextCreateFromArgs(int argc, const char **argv);
 void         ScreenSharing_ContextDestroy(ss_context_t *context);
 
 bool ScreenSharing_ServiceConnect(ss_context_t *context, const char *service_name);
