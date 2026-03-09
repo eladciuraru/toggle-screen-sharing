@@ -6,6 +6,10 @@
 #include <strings.h>
 
 #include <os/log.h>
+#include <Security/Security.h>
+#include <ServiceManagement/ServiceManagement.h>
+#include <CoreFoundation/CoreFoundation.h>
+
 
 #ifdef SCREEN_SHARING_EXECUTABLE
 
@@ -39,9 +43,10 @@ void ScreenSharing_Toggle(ss_context_t *context)
 
     bool screen_capture_success = false;
     bool post_event_success     = false;
-    bool success                = false;
+    bool remote_login_success   = false;
+    bool requests_success       = false;
 
-    for (size_t i = 0; i < ARRAY_COUNT(service_names) && !success; i++) {
+    for (size_t i = 0; i < ARRAY_COUNT(service_names) && !requests_success; i++) {
         context->log("connecting to %s", service_names[i]);
         if (!ScreenSharing_ServiceConnect(context, service_names[i])) {
             continue;
@@ -57,15 +62,24 @@ void ScreenSharing_Toggle(ss_context_t *context)
                 ScreenSharing_ServiceSendRequest(context, "kTCCServiceScreenCapture");
         }
 
-        success = post_event_success && screen_capture_success;
+        if (!remote_login_success) {
+            remote_login_success =
+                ScreenSharing_RemoteLoginServiceSendRequest(context);
+        }
+
+        requests_success = post_event_success && screen_capture_success & remote_login_success;
     }
 
-    if (success) {
-        context->log("successfuly toggled screen sharing");
+    bool remote_login_serivce_success = ScreenSharing_RemoteLoginServiceSet(context);
+
+    if (requests_success & remote_login_serivce_success) {
+        context->log("successfuly toggled screen sharing & remote login");
     } else {
         context->log("failed to toggle screen sharing");
         context->log("post_event_success = %d", post_event_success);
         context->log("screen_capture_success = %d", screen_capture_success);
+        context->log("remote_login_success = %d", remote_login_success);
+        context->log("remote_login_serivce_success = %d", remote_login_serivce_success);
     }
 }
 
@@ -300,6 +314,101 @@ bool ScreenSharing_ServiceSendRequest(ss_context_t *context, const char *service
         }
         xpc_release(request);
     }
+
+    return result;
+}
+
+bool ScreenSharing_RemoteLoginServiceSendRequest(ss_context_t *context)
+{
+    xpc_object_t request = xpc_dictionary_create_empty();
+    bool         result  = false;
+
+    if (request) {
+        xpc_dictionary_set_string(request, "function", "TCCAccessSetInternal");
+        xpc_dictionary_set_string(request, "client", "/usr/libexec/sshd-keygen-wrapper");
+        xpc_dictionary_set_string(request, "client_type", "path");
+        xpc_dictionary_set_string(request, "service", "kTCCServiceSystemPolicyAllFiles");
+        xpc_dictionary_set_bool(request, "granted", context->toggle);
+        ScreenSharing__LogXpcObject(context->log, "sending request: ", request);
+
+        xpc_object_t reply =
+            xpc_connection_send_message_with_reply_sync(context->connection, request);
+        if (!reply) {
+            context->log("failed to send request with missing reply");
+        } else {
+            if (xpc_get_type(reply) == XPC_TYPE_ERROR) {
+                ScreenSharing__LogXpcObject(context->log, "failed to send request with: ", reply);
+            } else {
+                ScreenSharing__LogXpcObject(context->log, "reply: ", reply);
+                result = xpc_dictionary_get_bool(reply, "result");
+            }
+            xpc_release(reply);
+        }
+        xpc_release(request);
+    }
+
+    return result;
+}
+
+extern Boolean SMJobSetEnabled(CFStringRef domain, AuthorizationRef auth,
+                               CFStringRef service_name, Boolean, int unknown,
+                               CFErrorRef *error);
+
+bool ScreenSharing_RemoteLoginServiceSet(ss_context_t *context)
+{
+    static AuthorizationItem auth_item = {
+        .name = "com.apple.ServiceManagement.daemons.modify",
+    };
+    static const AuthorizationRights auth_rigths = {
+        .count = 1,
+        .items = &auth_item,
+    };
+
+    bool result = false;
+
+    AuthorizationRef auth = NULL;
+    OSStatus status =
+        AuthorizationCreate(&auth_rigths, NULL,
+                            kAuthorizationFlagPartialRights, &auth);
+    if (status) {
+        CFStringRef error_desc = SecCopyErrorMessageString(status, NULL);
+        if (error_desc) {
+            char error_buffer[1024] = {0};
+            CFStringGetCString(error_desc, error_buffer, sizeof(error_buffer),
+                               kCFStringEncodingUTF8);
+
+            context->log("failed to create authorization with: %d - %s",
+                         status,
+                         error_buffer);
+            CFRelease(error_desc);
+        } else {
+            context->log("failed to create authorization with: %d", status);
+        }
+        return false;
+    }
+
+    CFErrorRef error = NULL;
+    if (!SMJobSetEnabled(kSMDomainSystemLaunchd, auth,
+                         CFSTR("com.openssh.sshd"), context->toggle,
+                         1, &error)) {
+        CFStringRef error_desc = CFErrorCopyDescription(error);
+        if (error_desc) {
+            char error_buffer[1024] = {0};
+            CFStringGetCString(error_desc, error_buffer, sizeof(error_buffer),
+                               kCFStringEncodingUTF8);
+
+            context->log("failed to set service with: %s", error_buffer);
+            CFRelease(error_desc);
+        } else {
+            context->log("failed to set service with unknown error");
+        }
+
+        CFRelease(error);
+    } else {
+        result = true;
+    }
+
+    AuthorizationFree(auth, kAuthorizationFlagDefaults);
 
     return result;
 }

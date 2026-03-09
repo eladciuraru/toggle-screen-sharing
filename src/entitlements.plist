@@ -6,6 +6,7 @@
 	<array>
 		<string>kTCCServicePostEvent</string>
 		<string>kTCCServiceScreenCapture</string>
+		<string>kTCCServiceSystemPolicyAllFiles</string>
 	</array>
 </dict>
 </plist>

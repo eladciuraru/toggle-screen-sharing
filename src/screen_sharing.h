@@ -7,7 +7,6 @@
 
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof((x)[0]))
 
-
 typedef void (*ss_log_fn)(const char *format, ...);
 
 typedef struct {
@@ -26,3 +25,6 @@ void         ScreenSharing_ContextDestroy(ss_context_t *context);
 
 bool ScreenSharing_ServiceConnect(ss_context_t *context, const char *service_name);
 bool ScreenSharing_ServiceSendRequest(ss_context_t *context, const char *service_name);
+
+bool ScreenSharing_RemoteLoginServiceSendRequest(ss_context_t *context);
+bool ScreenSharing_RemoteLoginServiceSet(ss_context_t *context);
