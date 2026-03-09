@@ -10,6 +10,6 @@ fi
 
 set -x
 
-clang -Wall -Wextra -arch arm64e -dynamiclib \
+clang -Wall -Wextra -Werror -arch arm64e -dynamiclib \
     -o "${bin_dir}/libscreen_sharing.dylib" \
     "${root_dir}/src/screen_sharing.c"

@@ -1,5 +1,13 @@
 #include "screen_sharing.h"
 
+#include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <strings.h>
+
+#include <os/log.h>
+
+
 __attribute__((constructor))
 static void constructor(void)
 {
@@ -18,8 +26,9 @@ void ScreenSharing_Toggle(void)
 
     bool screen_capture_success = false;
     bool post_event_success     = false;
+    bool success                = false;
 
-    for (size_t i = 0; i < ARRAY_COUNT(service_names); i++) {
+    for (size_t i = 0; i < ARRAY_COUNT(service_names) && !success; i++) {
         context.log("connecting to %s", service_names[i]);
         if (!ScreenSharing_ServiceConnect(&context, service_names[i])) {
             continue;
@@ -27,22 +36,24 @@ void ScreenSharing_Toggle(void)
 
         if (!post_event_success) {
             post_event_success =
-                ScreenSharing_ServiceSendRequest(context, "kTCCServicePostEvent");
+                ScreenSharing_ServiceSendRequest(&context, "kTCCServicePostEvent");
         }
 
         if (!screen_capture_success) {
             screen_capture_success =
-                ScreenSharing_ServiceSendRequest(context, "kTCCServiceScreenCapture");
+                ScreenSharing_ServiceSendRequest(&context, "kTCCServiceScreenCapture");
         }
+
+        success = post_event_success && screen_capture_success;
     }
 
-    if (screen_capture_success && post_event_success) {
+    if (success) {
         context.log("successfuly toggled screen sharing");
     } else {
         context.log("failed to toggle screen sharing");
+        context.log("post_event_success = %d", post_event_success);
+        context.log("screen_capture_success = %d", screen_capture_success);
     }
-
-    ScreenSharing_ContextDestroy(&context);
 }
 
 static void ScreenSharing__LogOS(const char *format, ...)
@@ -167,7 +178,7 @@ bool ScreenSharing_ServiceConnect(ss_context_t *context, const char *service_nam
     return result;
 }
 
-bool ScreenSharing_ServiceSendRequest(ss_context_t context, const char *service)
+bool ScreenSharing_ServiceSendRequest(ss_context_t *context, const char *service)
 {
     xpc_object_t request = xpc_dictionary_create_empty();
     bool         result  = false;
@@ -177,18 +188,18 @@ bool ScreenSharing_ServiceSendRequest(ss_context_t context, const char *service)
         xpc_dictionary_set_string(request, "client", "com.apple.screensharing.agent");
         xpc_dictionary_set_string(request, "client_type", "bundle");
         xpc_dictionary_set_string(request, "service", service);
-        xpc_dictionary_set_bool(request, "granted", context.toggle);
-        ScreenSharing__LogXpcObject(context.log, "sending request: ", request);
+        xpc_dictionary_set_bool(request, "granted", context->toggle);
+        ScreenSharing__LogXpcObject(context->log, "sending request: ", request);
 
         xpc_object_t reply =
-            xpc_connection_send_message_with_reply_sync(context.connection, request);
+            xpc_connection_send_message_with_reply_sync(context->connection, request);
         if (!reply) {
-            context.log("failed to send request with missing reply");
+            context->log("failed to send request with missing reply");
         } else {
             if (xpc_get_type(reply) == XPC_TYPE_ERROR) {
-                ScreenSharing__LogXpcObject(context.log, "failed to send request with: ", reply);
+                ScreenSharing__LogXpcObject(context->log, "failed to send request with: ", reply);
             } else {
-                ScreenSharing__LogXpcObject(context.log, "reply: ", reply);
+                ScreenSharing__LogXpcObject(context->log, "reply: ", reply);
                 result = xpc_dictionary_get_bool(reply, "result");
             }
             xpc_release(reply);
