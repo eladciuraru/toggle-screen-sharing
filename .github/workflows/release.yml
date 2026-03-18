@@ -21,10 +21,13 @@ jobs:
       - name: Package
         run: |
           mv bin/libscreen_sharing.dylib "bin/libscreen_sharing-${GITHUB_REF_NAME}.dylib"
+          mv bin/screen_sharing "bin/screen_sharing-${GITHUB_REF_NAME}"
 
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: bin/libscreen_sharing-${{ github.ref_name }}.dylib
+          files: |
+            bin/screen_sharing-${GITHUB_REF_NAME}
+            bin/libscreen_sharing-${GITHUB_REF_NAME}.dylib
           name: ${{ github.ref_name }}
           generate_release_notes: true
