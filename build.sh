@@ -3,7 +3,9 @@ set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bin_dir="${root_dir}/bin"
-common_flags="-Wall -Wextra -Werror -arch arm64e"
+common_flags="-Wall -Wextra -Werror -arch arm64e \
+    -framework Security -framework ServiceManagement \
+    -framework CoreFoundation"
 
 if [[ ! -d "${bin_dir}" ]]; then
     mkdir -p "${bin_dir}"
