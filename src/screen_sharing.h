@@ -29,20 +29,21 @@ typedef struct {
 static inline ss_request_t ScreenSharing_ScreenRequest(const char *service, bool toggle)
 {
     return (ss_request_t) {
-        .client = "com.apple.screensharing.agent",
-        .client_type = "bundle",
+        .client       = "com.apple.screensharing.agent",
+        .client_type  = "bundle",
         .service_name = service,
-        .toggle = toggle,
+        .toggle       = toggle,
     };
 }
 
-static inline ss_request_t ScreenSharing_RemoteLoginRequest(const char *service, bool toggle)
+static inline ss_request_t ScreenSharing_RemoteLoginRequest(const char *service,
+                                                            bool        toggle)
 {
     return (ss_request_t) {
-        .client = "/usr/libexec/sshd-keygen-wrapper",
-        .client_type = "path",
+        .client       = "/usr/libexec/sshd-keygen-wrapper",
+        .client_type  = "path",
         .service_name = service,
-        .toggle = toggle,
+        .toggle       = toggle,
     };
 }
 
@@ -55,6 +56,5 @@ void         ScreenSharing_ContextDestroy(ss_context_t *context);
 bool ScreenSharing_ServiceConnect(ss_context_t *context, const char *service_name);
 bool ScreenSharing_ServiceSendRequest(ss_context_t *context, ss_request_t request);
 
-bool ScreenSharing_ServiceSet(
-    ss_context_t *context, const char *service_name, bool toggle
-);
+bool ScreenSharing_ServiceSet(ss_context_t *context, const char *service_name,
+                              bool toggle);

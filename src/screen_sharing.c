@@ -1,43 +1,43 @@
 #include "screen_sharing.h"
 
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
 
-#include <os/log.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include <Security/Security.h>
 #include <ServiceManagement/ServiceManagement.h>
-#include <CoreFoundation/CoreFoundation.h>
-
+#include <os/log.h>
 
 #ifdef SCREEN_SHARING_EXECUTABLE
 
 int main(int argc, const char **argv)
 {
     ss_context_t context = ScreenSharing_ContextCreateFromArgs(argc, argv);
-    bool result = ScreenSharing_Toggle(&context);
+    bool         result  = ScreenSharing_Toggle(&context);
     ScreenSharing_ContextDestroy(&context);
     return !result;
 }
 
 #else
 
-__attribute__((constructor))
-static void constructor(void)
+__attribute__((constructor)) static void constructor(void)
 {
     ss_context_t context = ScreenSharing_ContextCreateFromEnv();
-    bool result = ScreenSharing_Toggle(&context);
+    bool         result  = ScreenSharing_Toggle(&context);
     ScreenSharing_ContextDestroy(&context);
     exit(!result);
 }
 
-#endif  // SCREEN_SHARING_EXECUTABLE
+#endif // SCREEN_SHARING_EXECUTABLE
 
 bool ScreenSharing_Toggle(ss_context_t *context)
 {
-    context->log("toggling screen sharing to %s", (context->screen_sharing_toggle) ? "on" : "off");
-    context->log("toggling remote login to %s", (context->remote_login_toggle) ? "on" : "off");
+    context->log("toggling screen sharing to %s",
+                 (context->screen_sharing_toggle) ? "on" : "off");
+    context->log("toggling remote login to %s",
+                 (context->remote_login_toggle) ? "on" : "off");
 
     const char *service_names[] = {
         "com.apple.tccd.system",
@@ -57,42 +57,39 @@ bool ScreenSharing_Toggle(ss_context_t *context)
 
         if (!post_event_success) {
             ss_request_t request =
-                ScreenSharing_ScreenRequest(
-                    "kTCCServicePostEvent", context->screen_sharing_toggle
-                );
+                ScreenSharing_ScreenRequest("kTCCServicePostEvent",
+                                            context->screen_sharing_toggle);
             post_event_success = ScreenSharing_ServiceSendRequest(context, request);
         }
 
         if (!screen_capture_success) {
             ss_request_t request =
-                ScreenSharing_ScreenRequest(
-                    "kTCCServiceScreenCapture", context->screen_sharing_toggle
-                );
-            screen_capture_success = ScreenSharing_ServiceSendRequest(context, request);
+                ScreenSharing_ScreenRequest("kTCCServiceScreenCapture",
+                                            context->screen_sharing_toggle);
+            screen_capture_success =
+                ScreenSharing_ServiceSendRequest(context, request);
         }
 
         if (!remote_login_success) {
-            ss_request_t request =
-                ScreenSharing_RemoteLoginRequest(
-                    "kTCCServiceSystemPolicyAllFiles", context->remote_login_toggle
-                );
+            ss_request_t request = ScreenSharing_RemoteLoginRequest(
+                "kTCCServiceSystemPolicyAllFiles", context->remote_login_toggle);
             remote_login_success = ScreenSharing_ServiceSendRequest(context, request);
         }
 
-        requests_success = post_event_success && screen_capture_success & remote_login_success;
+        requests_success =
+            post_event_success && screen_capture_success & remote_login_success;
     }
 
     bool remote_login_serivce_success =
-        ScreenSharing_ServiceSet(
-            context, "com.openssh.sshd", context->remote_login_toggle
-        );
+        ScreenSharing_ServiceSet(context, "com.openssh.sshd",
+                                 context->remote_login_toggle);
     bool screen_sharing_serivce_success =
-        ScreenSharing_ServiceSet(
-            context, "com.apple.screensharing", context->screen_sharing_toggle
-        );
+        ScreenSharing_ServiceSet(context, "com.apple.screensharing",
+                                 context->screen_sharing_toggle);
 
     bool result = false;
-    if (requests_success & remote_login_serivce_success && screen_sharing_serivce_success) {
+    if (requests_success & remote_login_serivce_success &&
+        screen_sharing_serivce_success) {
         context->log("successfuly toggled screen sharing & remote login");
         result = true;
     } else {
@@ -101,7 +98,8 @@ bool ScreenSharing_Toggle(ss_context_t *context)
         context->log("screen_capture_success = %d", screen_capture_success);
         context->log("remote_login_success = %d", remote_login_success);
         context->log("remote_login_serivce_success = %d", remote_login_serivce_success);
-        context->log("screen_sharing_serivce_success = %d", screen_sharing_serivce_success);
+        context->log("screen_sharing_serivce_success = %d",
+                     screen_sharing_serivce_success);
     }
 
     return result;
@@ -145,7 +143,7 @@ static void ScreenSharing__LogStdout(const char *format, ...)
 
 static void ScreenSharing__LogQuiet(const char *format, ...)
 {
-    (void)format;
+    (void) format;
 }
 
 static ss_log_fn ScreenSharing__LogFnFromString(const char *name, ss_log_fn default_fn)
@@ -187,8 +185,8 @@ ss_context_t ScreenSharing_ContextCreateFromEnv(void)
     ss_context_t context = {0};
 
     char *screen_sharing_log = getenv("SCREEN_SHARING_LOG");
-    context.log =
-        ScreenSharing__LogFnFromString(screen_sharing_log, ScreenSharing__LogStderr);
+    context.log = ScreenSharing__LogFnFromString(screen_sharing_log,
+                                                 ScreenSharing__LogStderr);
 
     char *screen_sharing_toggle = getenv("SCREEN_SHARING_TOGGLE");
     if (!screen_sharing_toggle || !strcasecmp(screen_sharing_toggle, "on")) {
@@ -197,7 +195,8 @@ ss_context_t ScreenSharing_ContextCreateFromEnv(void)
         context.screen_sharing_toggle = false;
     } else {
         context.remote_login_toggle = true;
-        context.log("unknown screen sharing toggle \"%s\", defaulting to on", screen_sharing_toggle);
+        context.log("unknown screen sharing toggle \"%s\", defaulting to on",
+                    screen_sharing_toggle);
     }
 
     char *remote_login_toggle = getenv("REMOTE_LOGIN_TOGGLE");
@@ -207,7 +206,8 @@ ss_context_t ScreenSharing_ContextCreateFromEnv(void)
         context.remote_login_toggle = false;
     } else {
         context.remote_login_toggle = true;
-        context.log("unknown remote login toggle \"%s\", defaulting to on", remote_login_toggle);
+        context.log("unknown remote login toggle \"%s\", defaulting to on",
+                    remote_login_toggle);
     }
 
     return context;
@@ -216,9 +216,9 @@ ss_context_t ScreenSharing_ContextCreateFromEnv(void)
 ss_context_t ScreenSharing_ContextCreateFromArgs(int argc, const char **argv)
 {
     ss_context_t context = {
-        .log = ScreenSharing__LogStdout,
+        .log                   = ScreenSharing__LogStdout,
         .screen_sharing_toggle = true,
-        .remote_login_toggle = true,
+        .remote_login_toggle   = true,
     };
 
     if (argc < 1) {
@@ -230,15 +230,14 @@ ss_context_t ScreenSharing_ContextCreateFromArgs(int argc, const char **argv)
 
     for (int i = 1; i < argc && !show_usage; i++) {
         if (!strcmp(argv[i], "--log")) {
-            if (i + 1 >= argc || argv[i+1][0] == '-') {
+            if (i + 1 >= argc || argv[i + 1][0] == '-') {
                 ScreenSharing__LogStderr("missing value for log");
                 show_usage = true;
             } else {
-                context.log =
-                    ScreenSharing__LogFnFromString(argv[++i], context.log);
+                context.log = ScreenSharing__LogFnFromString(argv[++i], context.log);
             }
         } else if (!strcmp(argv[i], "--screen-sharing")) {
-            if (i + 1 >= argc || argv[i+1][0] == '-') {
+            if (i + 1 >= argc || argv[i + 1][0] == '-') {
                 ScreenSharing__LogStderr("missing value for screen-sharing");
                 show_usage = true;
             } else if (!strcasecmp(argv[++i], "on")) {
@@ -249,7 +248,7 @@ ss_context_t ScreenSharing_ContextCreateFromArgs(int argc, const char **argv)
                 ScreenSharing__LogStderr("unknown value for screen-sharing");
             }
         } else if (!strcmp(argv[i], "--remote-login")) {
-            if (i + 1 >= argc || argv[i+1][0] == '-') {
+            if (i + 1 >= argc || argv[i + 1][0] == '-') {
                 ScreenSharing__LogStderr("missing value for remote-login");
                 show_usage = true;
             } else if (!strcasecmp(argv[++i], "on")) {
@@ -259,8 +258,7 @@ ss_context_t ScreenSharing_ContextCreateFromArgs(int argc, const char **argv)
             } else {
                 ScreenSharing__LogStderr("unknown value for remote-login");
             }
-        } else if (!strcmp(argv[i], "--help") ||
-                   !strcmp(argv[i], "-h")) {
+        } else if (!strcmp(argv[i], "--help") || !strcmp(argv[i], "-h")) {
             show_usage = true;
         } else {
             ScreenSharing__LogStderr("unknown argument '%s'", argv[i]);
@@ -274,15 +272,18 @@ ss_context_t ScreenSharing_ContextCreateFromArgs(int argc, const char **argv)
             "Toggle on/off screen sharing.\n\n"
             "Options:\n"
             "  --log <mode>                Set logging output.\n"
-            "                              Supported modes stdout/stderr/os/quiet.\n"
+            "                              Supported modes "
+            "stdout/stderr/os/quiet.\n"
             "                              Default: stdout\n"
-            "  --screen-sharing <on|off>   Enable or disable screen sharing toggle.\n"
+            "  --screen-sharing <on|off>   Enable or disable screen sharing "
+            "toggle.\n"
             "                              Default: on\n"
-            "  --remote-login <on|off>     Enable or disable remote login toggle.\n"
+            "  --remote-login <on|off>     Enable or disable remote login "
+            "toggle.\n"
             "                              Default: on\n"
-            "  -h, --help                  Show this help message and exit.\n\n",
-            program_name
-        );
+            "  -h, --help                  Show this help message and "
+            "exit.\n\n",
+            program_name);
         exit(1);
     }
 
@@ -311,24 +312,22 @@ bool ScreenSharing_ServiceConnect(ss_context_t *context, const char *service_nam
         dispatch_queue_create("com.screen-sharing.toggle.queue", DISPATCH_QUEUE_SERIAL);
     if (!dispatch_queue) {
         context->log("failed to create dispatch queue");
-
     } else {
         xpc_connection_t connection =
             xpc_connection_create_mach_service(service_name, dispatch_queue, 0);
         if (!connection) {
             context->log("failed to create connection");
             dispatch_release(dispatch_queue);
-
         } else {
             xpc_connection_set_event_handler(connection, ^(xpc_object_t event) {
-                (void)event;
+              (void) event;
             });
             xpc_connection_resume(connection);
 
             ScreenSharing_ContextDestroy(context);
-            context->connection = connection;
+            context->connection     = connection;
             context->dispatch_queue = dispatch_queue;
-            result = true;
+            result                  = true;
         }
     }
 
@@ -338,7 +337,7 @@ bool ScreenSharing_ServiceConnect(ss_context_t *context, const char *service_nam
 bool ScreenSharing_ServiceSendRequest(ss_context_t *context, ss_request_t request)
 {
     xpc_object_t xpc_request = xpc_dictionary_create_empty();
-    bool         result  = false;
+    bool         result      = false;
 
     if (xpc_request) {
         xpc_dictionary_set_string(xpc_request, "function", "TCCAccessSetInternal");
@@ -354,7 +353,8 @@ bool ScreenSharing_ServiceSendRequest(ss_context_t *context, ss_request_t reques
             context->log("failed to send request with missing reply");
         } else {
             if (xpc_get_type(reply) == XPC_TYPE_ERROR) {
-                ScreenSharing__LogXpcObject(context->log, "failed to send request with: ", reply);
+                ScreenSharing__LogXpcObject(context->log,
+                                            "failed to send request with: ", reply);
             } else {
                 ScreenSharing__LogXpcObject(context->log, "reply: ", reply);
                 result = xpc_dictionary_get_bool(reply, "result");
@@ -367,14 +367,11 @@ bool ScreenSharing_ServiceSendRequest(ss_context_t *context, ss_request_t reques
     return result;
 }
 
-bool ScreenSharing_ServiceSet(ss_context_t *context, const char *service_name,
-                              bool toggle)
+bool ScreenSharing_ServiceSet(ss_context_t *context, const char *service_name, bool toggle)
 {
-    extern Boolean SMJobSetEnabled(
-        CFStringRef domain, AuthorizationRef auth,
-        CFStringRef service_name, Boolean, int unknown,
-        CFErrorRef *error
-    );
+    extern Boolean SMJobSetEnabled(CFStringRef domain, AuthorizationRef auth,
+                                   CFStringRef service_name, Boolean,
+                                   int unknown, CFErrorRef *error);
 
     static AuthorizationItem auth_item = {
         .name = "com.apple.ServiceManagement.daemons.modify",
@@ -386,10 +383,9 @@ bool ScreenSharing_ServiceSet(ss_context_t *context, const char *service_name,
 
     bool result = false;
 
-    AuthorizationRef auth = NULL;
-    OSStatus status =
-        AuthorizationCreate(&auth_rigths, NULL,
-                            kAuthorizationFlagPartialRights, &auth);
+    AuthorizationRef auth   = NULL;
+    OSStatus         status = AuthorizationCreate(&auth_rigths, NULL,
+                                                  kAuthorizationFlagPartialRights, &auth);
     if (status) {
         CFStringRef error_desc = SecCopyErrorMessageString(status, NULL);
         if (error_desc) {
@@ -397,8 +393,7 @@ bool ScreenSharing_ServiceSet(ss_context_t *context, const char *service_name,
             CFStringGetCString(error_desc, error_buffer, sizeof(error_buffer),
                                kCFStringEncodingUTF8);
 
-            context->log("failed to create authorization with: %d - %s",
-                         status,
+            context->log("failed to create authorization with: %d - %s", status,
                          error_buffer);
             CFRelease(error_desc);
         } else {
@@ -407,17 +402,15 @@ bool ScreenSharing_ServiceSet(ss_context_t *context, const char *service_name,
         return false;
     }
 
-    CFErrorRef error = NULL;
+    CFErrorRef  error = NULL;
     CFStringRef service_name_cf =
-        CFStringCreateWithCString(
-            kCFAllocatorSystemDefault, service_name, kCFStringEncodingUTF8
-        );
+        CFStringCreateWithCString(kCFAllocatorSystemDefault, service_name,
+                                  kCFStringEncodingUTF8);
 
     if (!service_name_cf) {
         context->log("failed to allocate service name cfstring");
-
-    } else if (!SMJobSetEnabled(kSMDomainSystemLaunchd, auth,
-                                service_name_cf, toggle, 1, &error)) {
+    } else if (!SMJobSetEnabled(kSMDomainSystemLaunchd, auth, service_name_cf,
+                                toggle, 1, &error)) {
         CFStringRef error_desc = CFErrorCopyDescription(error);
         if (error_desc) {
             char error_buffer[1024] = {0};

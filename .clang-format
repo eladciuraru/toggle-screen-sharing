@@ -1,0 +1,42 @@
+BasedOnStyle: LLVM
+
+IndentWidth: 4
+UseTab: Never
+
+ColumnLimit: 80
+
+BreakBeforeBraces: Custom
+
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: false
+  AfterStruct: false
+  AfterUnion: false
+
+PointerAlignment: Right
+DerivePointerAlignment: false
+
+AlignConsecutiveDeclarations:
+  Enabled: true
+
+AlignConsecutiveAssignments:
+  Enabled: true
+
+AlignConsecutiveMacros:
+  Enabled: true
+
+SpaceBeforeParens: ControlStatements
+SpaceAfterCStyleCast: true
+
+PenaltyExcessCharacter: 2
+PenaltyBreakBeforeFirstCallParameter: 100
+
+BinPackArguments: true
+BinPackParameters: true
+
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Empty
+
+IncludeBlocks: Preserve
+SortIncludes: false
