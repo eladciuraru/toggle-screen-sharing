@@ -55,4 +55,6 @@ void         ScreenSharing_ContextDestroy(ss_context_t *context);
 bool ScreenSharing_ServiceConnect(ss_context_t *context, const char *service_name);
 bool ScreenSharing_ServiceSendRequest(ss_context_t *context, ss_request_t request);
 
-bool ScreenSharing_RemoteLoginServiceSet(ss_context_t *context);
+bool ScreenSharing_ServiceSet(
+    ss_context_t *context, const char *service_name, bool toggle
+);

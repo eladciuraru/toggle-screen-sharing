@@ -82,10 +82,17 @@ bool ScreenSharing_Toggle(ss_context_t *context)
         requests_success = post_event_success && screen_capture_success & remote_login_success;
     }
 
-    bool remote_login_serivce_success = ScreenSharing_RemoteLoginServiceSet(context);
+    bool remote_login_serivce_success =
+        ScreenSharing_ServiceSet(
+            context, "com.openssh.sshd", context->remote_login_toggle
+        );
+    bool screen_sharing_serivce_success =
+        ScreenSharing_ServiceSet(
+            context, "com.apple.screensharing", context->screen_sharing_toggle
+        );
 
     bool result = false;
-    if (requests_success & remote_login_serivce_success) {
+    if (requests_success & remote_login_serivce_success && screen_sharing_serivce_success) {
         context->log("successfuly toggled screen sharing & remote login");
         result = true;
     } else {
@@ -94,6 +101,7 @@ bool ScreenSharing_Toggle(ss_context_t *context)
         context->log("screen_capture_success = %d", screen_capture_success);
         context->log("remote_login_success = %d", remote_login_success);
         context->log("remote_login_serivce_success = %d", remote_login_serivce_success);
+        context->log("screen_sharing_serivce_success = %d", screen_sharing_serivce_success);
     }
 
     return result;
@@ -359,7 +367,8 @@ bool ScreenSharing_ServiceSendRequest(ss_context_t *context, ss_request_t reques
     return result;
 }
 
-bool ScreenSharing_RemoteLoginServiceSet(ss_context_t *context)
+bool ScreenSharing_ServiceSet(ss_context_t *context, const char *service_name,
+                              bool toggle)
 {
     extern Boolean SMJobSetEnabled(
         CFStringRef domain, AuthorizationRef auth,
@@ -399,9 +408,16 @@ bool ScreenSharing_RemoteLoginServiceSet(ss_context_t *context)
     }
 
     CFErrorRef error = NULL;
-    if (!SMJobSetEnabled(kSMDomainSystemLaunchd, auth,
-                         CFSTR("com.openssh.sshd"), context->remote_login_toggle,
-                         1, &error)) {
+    CFStringRef service_name_cf =
+        CFStringCreateWithCString(
+            kCFAllocatorSystemDefault, service_name, kCFStringEncodingUTF8
+        );
+
+    if (!service_name_cf) {
+        context->log("failed to allocate service name cfstring");
+
+    } else if (!SMJobSetEnabled(kSMDomainSystemLaunchd, auth,
+                                service_name_cf, toggle, 1, &error)) {
         CFStringRef error_desc = CFErrorCopyDescription(error);
         if (error_desc) {
             char error_buffer[1024] = {0};
@@ -419,6 +435,9 @@ bool ScreenSharing_RemoteLoginServiceSet(ss_context_t *context)
         result = true;
     }
 
+    if (service_name_cf) {
+        CFRelease(service_name_cf);
+    }
     AuthorizationFree(auth, kAuthorizationFlagDefaults);
 
     return result;
