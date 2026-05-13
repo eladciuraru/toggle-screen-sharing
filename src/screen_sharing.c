@@ -16,8 +16,9 @@
 int main(int argc, const char **argv)
 {
     ss_context_t context = ScreenSharing_ContextCreateFromArgs(argc, argv);
-    ScreenSharing_Toggle(&context);
+    bool result = ScreenSharing_Toggle(&context);
     ScreenSharing_ContextDestroy(&context);
+    return !result;
 }
 
 #else
@@ -26,13 +27,14 @@ __attribute__((constructor))
 static void constructor(void)
 {
     ss_context_t context = ScreenSharing_ContextCreateFromEnv();
-    ScreenSharing_Toggle(&context);
+    bool result = ScreenSharing_Toggle(&context);
     ScreenSharing_ContextDestroy(&context);
+    exit(!result);
 }
 
 #endif  // SCREEN_SHARING_EXECUTABLE
 
-void ScreenSharing_Toggle(ss_context_t *context)
+bool ScreenSharing_Toggle(ss_context_t *context)
 {
     context->log("toggling screen sharing to %s", (context->screen_sharing_toggle) ? "on" : "off");
     context->log("toggling remote login to %s", (context->remote_login_toggle) ? "on" : "off");
@@ -82,8 +84,10 @@ void ScreenSharing_Toggle(ss_context_t *context)
 
     bool remote_login_serivce_success = ScreenSharing_RemoteLoginServiceSet(context);
 
+    bool result = false;
     if (requests_success & remote_login_serivce_success) {
         context->log("successfuly toggled screen sharing & remote login");
+        result = true;
     } else {
         context->log("failed to toggle screen sharing");
         context->log("post_event_success = %d", post_event_success);
@@ -91,6 +95,8 @@ void ScreenSharing_Toggle(ss_context_t *context)
         context->log("remote_login_success = %d", remote_login_success);
         context->log("remote_login_serivce_success = %d", remote_login_serivce_success);
     }
+
+    return result;
 }
 
 static void ScreenSharing__LogOS(const char *format, ...)
@@ -151,7 +157,8 @@ static ss_log_fn ScreenSharing__LogFnFromString(const char *name, ss_log_fn defa
     return default_fn;
 }
 
-static void ScreenSharing__LogXpcObject(ss_log_fn log_fn, const char *message, xpc_object_t object)
+static void ScreenSharing__LogXpcObject(ss_log_fn log_fn, const char *message,
+                                        xpc_object_t object)
 {
     log_fn("%s", message);
 

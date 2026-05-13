@@ -16,7 +16,7 @@ there are 2 modes supported for running this tool.
 2. injectable dynamic library
 
 for both of the modes, SIP needs to be disabled,
-and should be run as root.
+and the binaries should be run as root.
 
 ### Executable Mode
 
@@ -24,15 +24,15 @@ because this is a self signed executable, `amfi` needs to be disabled,
 either with `amfi_get_out_of_my_way` boot arg or the recommended way using
 [amfidont](https://github.com/zqxwce/amfidont) to allow this specific executable.
 
-then it can just run as a regular executable from command line.
+then it will be possible to run as a regular executable from command line.
 for example:
 
 ```shell
 # toggling on
-sudo ./bin/screen_sharing --toggle on
+sudo ./bin/screen_sharing --screen-sharing on
 
 # toggling off
-sudo ./bin/screen_sharing --toggle off
+sudo ./bin/screen_sharing --screen-sharing off
 ```
 
 ### Dynamic Library
@@ -57,6 +57,6 @@ sudo env SCREEN_SHARING_TOGGLE=off REMOTE_LOGIN_TOGGLE=off "DYLD_INSERT_LIBRARIE
 ```
 
 ## TODO
-- [ ] also handle screen sharing service
 - [ ] move from manually creating XPC to calling private TCC framework APIs
-- [ ] change so only provided toggle flags are used (e.g. if only remote loging is used then only send remote loging requests)
+- [ ] change so only provided toggle flags are used (e.g. if only remote login is used then only send remote login requests)
+- [ ] add kill for services when disabling them

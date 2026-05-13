@@ -46,7 +46,7 @@ static inline ss_request_t ScreenSharing_RemoteLoginRequest(const char *service,
     };
 }
 
-void ScreenSharing_Toggle(ss_context_t *context);
+bool ScreenSharing_Toggle(ss_context_t *context);
 
 ss_context_t ScreenSharing_ContextCreateFromEnv(void);
 ss_context_t ScreenSharing_ContextCreateFromArgs(int argc, const char **argv);
